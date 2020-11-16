@@ -33,28 +33,28 @@ public final class SyncExecutionStrategy<A> implements ExecutionStrategy<A, A> {
 
     private static <A> RecursiveResult<IO<A>, A> resume(IO<A> ioA) {
         if (ioA instanceof IO.Sequential<?, ?>) {
-            return recurse(((IO.Sequential<?, A>) ioA).interpret(new IO.Sequential.Psi<>() {
+            return ((IO.Sequential<?, A>) ioA).interpret(new IO.Sequential.Psi<>() {
                 @Override
-                public <Z> IO<A> apply(IO<Z> ioZ, Fn1<? super Z, ? extends IO<A>> f) {
+                public <Z> RecursiveResult<IO<A>, A> apply(IO<Z> ioZ, Fn1<? super Z, ? extends IO<A>> f) {
                     if (ioZ instanceof IO.Sequential<?, ?>) {
-                        return ((IO.Sequential<?, Z>) ioZ).interpret(new IO.Sequential.Psi<>() {
+                        return recurse(((IO.Sequential<?, Z>) ioZ).interpret(new IO.Sequential.Psi<>() {
                             @Override
                             public <Y> IO<A> apply(IO<Y> ioY, Fn1<? super Y, ? extends IO<Z>> g) {
                                 return ioY.flatMap(y -> g.apply(y).flatMap(f));
                             }
-                        });
+                        }));
                     } else if (ioZ instanceof IO.Parallel<?, ?>) {
-                        return ((IO.Parallel<?, Z>) ioZ).interpret(new IO.Parallel.Psi<>() {
+                        return recurse(((IO.Parallel<?, Z>) ioZ).interpret(new IO.Parallel.Psi<>() {
                             @Override
                             public <Y> IO<A> apply(IO<Y> ioY, IO<Fn1<? super Y, ? extends Z>> ioG) {
                                 return ioY.flatMap(y -> ioG.flatMap(g -> io(g.apply(y)).flatMap(f)));
                             }
-                        });
+                        }));
                     }
 
-                    return f.apply(ioZ.unsafePerformIO());
+                    return recurse(resume(ioZ).match(ioZ_ -> ioZ_.flatMap(f), f));
                 }
-            }));
+            });
         } else if (ioA instanceof IO.Parallel<?, ?>) {
             return recurse(((IO.Parallel<?, A>) ioA).interpret(new IO.Parallel.Psi<>() {
                 @Override
