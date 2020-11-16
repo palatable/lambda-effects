@@ -1,6 +1,7 @@
 package com.jnape.palatable.lambda.effects.benchmarks;
 
 import com.jnape.palatable.lambda.effects.IO;
+import com.jnape.palatable.lambda.functions.Fn1;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Level;
@@ -19,66 +20,120 @@ import static com.jnape.palatable.lambda.functions.builtin.fn3.Times.times;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static org.openjdk.jmh.annotations.Mode.Throughput;
 
-@BenchmarkMode(Throughput)
-@OutputTimeUnit(MICROSECONDS)
-@Warmup(iterations = 5, time = 1)
-@Measurement(iterations = 5, time = 1)
-@Fork(5)
 public class IOBenchmark {
 
     public static void main(String[] args) throws RunnerException {
-        runBenchmarks(IOBenchmark.class);
+        runBenchmarks(FlatMapSyncBenchmark.class);
+        runBenchmarks(ZipSyncBenchmark.class);
     }
 
-    @org.openjdk.jmh.annotations.Benchmark
-    @OperationsPerInvocation(K100)
-    public Integer largeLeftAssociatedSuspendedFlatMap(State state) {
-        return state.leftAssociatedSuspendedIO.unsafePerformIO();
-    }
+    @BenchmarkMode(Throughput)
+    @OutputTimeUnit(MICROSECONDS)
+    @Warmup(iterations = 5, time = 1)
+    @Measurement(iterations = 5, time = 1)
+    @Fork(5)
+    public static class FlatMapSyncBenchmark {
 
-    @org.openjdk.jmh.annotations.Benchmark
-    @OperationsPerInvocation(K100)
-    public Integer largeLeftAssociatedValueFlatMap(State state) {
-        return state.leftAssociatedValueIO.unsafePerformIO();
-    }
-
-    @org.openjdk.jmh.annotations.Benchmark
-    @OperationsPerInvocation(K100)
-    public Integer largeRightAssociatedSuspendedFlatMap(State state) {
-        return state.rightAssociatedSuspendedIO.unsafePerformIO();
-    }
-
-    @org.openjdk.jmh.annotations.Benchmark
-    @OperationsPerInvocation(K100)
-    public Integer largeRightAssociatedValueFlatMap(State state) {
-        return state.rightAssociatedValueIO.unsafePerformIO();
-    }
-
-    @org.openjdk.jmh.annotations.State(Scope.Benchmark)
-    public static class State {
-        IO<Integer> leftAssociatedSuspendedIO;
-        IO<Integer> leftAssociatedValueIO;
-        IO<Integer> rightAssociatedSuspendedIO;
-        IO<Integer> rightAssociatedValueIO;
-
-        @Setup(Level.Trial)
-        public void doSetup() {
-            leftAssociatedSuspendedIO  = times(K100, io -> io.flatMap(x -> io(() -> x + 1)), io(() -> 0));
-            leftAssociatedValueIO      = times(K100, io -> io.flatMap(x -> io(x + 1)), io(0));
-            rightAssociatedSuspendedIO = addSuspended(0);
-            rightAssociatedValueIO     = addValue(0);
+        @org.openjdk.jmh.annotations.Benchmark
+        @OperationsPerInvocation(K100)
+        public Integer leftAssociatedSuspended(State state) {
+            return state.leftAssociatedSuspended.unsafePerformIO();
         }
 
-        private static IO<Integer> addSuspended(Integer x) {
-            return x < K100
-                   ? io(() -> x + 1).flatMap(State::addSuspended)
-                   : io(x);
+        @org.openjdk.jmh.annotations.Benchmark
+        @OperationsPerInvocation(K100)
+        public Integer leftAssociatedValue(State state) {
+            return state.leftAssociatedValue.unsafePerformIO();
         }
 
-        private static IO<Integer> addValue(Integer x) {
-            return x < K100
-                   ? io(x + 1).flatMap(State::addValue)
-                   : io(x);
+        @org.openjdk.jmh.annotations.Benchmark
+        @OperationsPerInvocation(K100)
+        public Integer rightAssociatedSuspended(State state) {
+            return state.rightAssociatedSuspended.unsafePerformIO();
+        }
+
+        @org.openjdk.jmh.annotations.Benchmark
+        @OperationsPerInvocation(K100)
+        public Integer rightAssociatedValue(State state) {
+            return state.rightAssociatedValue.unsafePerformIO();
+        }
+
+        @org.openjdk.jmh.annotations.State(Scope.Benchmark)
+        public static class State {
+            IO<Integer> leftAssociatedSuspended;
+            IO<Integer> leftAssociatedValue;
+            IO<Integer> rightAssociatedSuspended;
+            IO<Integer> rightAssociatedValue;
+
+            @Setup(Level.Trial)
+            public void doSetup() {
+                leftAssociatedSuspended  = times(K100, io -> io.flatMap(x -> io(() -> x + 1)), io(() -> 0));
+                leftAssociatedValue      = times(K100, io -> io.flatMap(x -> io(x + 1)), io(0));
+                rightAssociatedSuspended = addSuspended(0);
+                rightAssociatedValue     = addValue(0);
+            }
+
+            private static IO<Integer> addSuspended(Integer x) {
+                return x < K100
+                       ? io(() -> x + 1).flatMap(State::addSuspended)
+                       : io(x);
+            }
+
+            private static IO<Integer> addValue(Integer x) {
+                return x < K100
+                       ? io(x + 1).flatMap(State::addValue)
+                       : io(x);
+            }
+        }
+    }
+
+    @BenchmarkMode(Throughput)
+    @OutputTimeUnit(MICROSECONDS)
+    @Warmup(iterations = 5, time = 1)
+    @Measurement(iterations = 5, time = 1)
+    @Fork(5)
+    public static class ZipSyncBenchmark {
+
+        @org.openjdk.jmh.annotations.Benchmark
+        @OperationsPerInvocation(K100)
+        public Integer leftLeaningSuspended(State state) {
+            return state.leftLeaningSuspended.unsafePerformIO();
+        }
+
+        @org.openjdk.jmh.annotations.Benchmark
+        @OperationsPerInvocation(K100)
+        public Integer leftLeaningValue(State state) {
+            return state.leftLeaningValue.unsafePerformIO();
+        }
+
+        @org.openjdk.jmh.annotations.Benchmark
+        @OperationsPerInvocation(K100)
+        public Integer rightLeaningSuspended(State state) {
+            return state.rightLeaningSuspended.unsafePerformIO();
+        }
+
+        @org.openjdk.jmh.annotations.Benchmark
+        @OperationsPerInvocation(K100)
+        public Integer rightLeaningValue(State state) {
+            return state.rightLeaningValue.unsafePerformIO();
+        }
+
+        @org.openjdk.jmh.annotations.State(Scope.Benchmark)
+        public static class State {
+            IO<Integer> leftLeaningSuspended;
+            IO<Integer> leftLeaningValue;
+            IO<Integer> rightLeaningSuspended;
+            IO<Integer> rightLeaningValue;
+
+            @Setup(Level.Trial)
+            public void doSetup() {
+                leftLeaningSuspended  = times(K100, io -> io.zip(io(() -> x -> x + 1)), io(() -> 0));
+                leftLeaningValue      = times(K100, io -> io.zip(io(x -> x + 1)), io(0));
+                rightLeaningSuspended = times(K100, io -> IO.<Fn1<Integer, Integer>>io(() -> x -> x + 1)
+                        .zip(io.flatMap(x -> io(() -> f -> f.apply(x)))), io(() -> 0));
+                rightLeaningValue     = times(K100, io -> IO.<Fn1<Integer, Integer>>io(x -> x + 1)
+                        .zip(io.flatMap(x -> io(f -> f.apply(x)))), io(0));
+            }
         }
     }
 }

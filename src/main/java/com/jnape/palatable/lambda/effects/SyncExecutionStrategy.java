@@ -4,6 +4,7 @@ import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
 import com.jnape.palatable.lambda.functions.recursion.RecursiveResult;
 
+import static com.jnape.palatable.lambda.effects.IO.io;
 import static com.jnape.palatable.lambda.functions.recursion.RecursiveResult.recurse;
 import static com.jnape.palatable.lambda.functions.recursion.RecursiveResult.terminate;
 import static com.jnape.palatable.lambda.functions.recursion.Trampoline.trampoline;
@@ -35,16 +36,30 @@ public final class SyncExecutionStrategy<A> implements ExecutionStrategy<A, A> {
             return recurse(((IO.Sequential<?, A>) ioA).interpret(new IO.Sequential.Psi<>() {
                 @Override
                 public <Z> IO<A> apply(IO<Z> ioZ, Fn1<? super Z, ? extends IO<A>> f) {
-                    IO.Sequential.Psi<IO<A>, Z> interpretOnceMore = new IO.Sequential.Psi<>() {
-                        @Override
-                        public <Y> IO<A> apply(IO<Y> ioY, Fn1<? super Y, ? extends IO<Z>> g) {
-                            return ioY.flatMap(y -> g.apply(y).flatMap(f));
-                        }
-                    };
+                    if (ioZ instanceof IO.Sequential<?, ?>) {
+                        return ((IO.Sequential<?, Z>) ioZ).interpret(new IO.Sequential.Psi<>() {
+                            @Override
+                            public <Y> IO<A> apply(IO<Y> ioY, Fn1<? super Y, ? extends IO<Z>> g) {
+                                return ioY.flatMap(y -> g.apply(y).flatMap(f));
+                            }
+                        });
+                    } else if (ioZ instanceof IO.Parallel<?, ?>) {
+                        return ((IO.Parallel<?, Z>) ioZ).interpret(new IO.Parallel.Psi<>() {
+                            @Override
+                            public <Y> IO<A> apply(IO<Y> ioY, IO<Fn1<? super Y, ? extends Z>> ioG) {
+                                return ioY.flatMap(y -> ioG.flatMap(g -> io(g.apply(y)).flatMap(f)));
+                            }
+                        });
+                    }
 
-                    return ioZ instanceof IO.Sequential<?, ?>
-                           ? ((IO.Sequential<?, Z>) ioZ).interpret(interpretOnceMore)
-                           : f.apply(ioZ.unsafePerformIO());
+                    return f.apply(ioZ.unsafePerformIO());
+                }
+            }));
+        } else if (ioA instanceof IO.Parallel<?, ?>) {
+            return recurse(((IO.Parallel<?, A>) ioA).interpret(new IO.Parallel.Psi<>() {
+                @Override
+                public <Z> IO<A> apply(IO<Z> ioZ, IO<Fn1<? super Z, ? extends A>> ioG) {
+                    return ioZ.flatMap(z -> ioG.flatMap(g -> io(g.apply(z))));
                 }
             }));
         }
